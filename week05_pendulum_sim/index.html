@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>单摆模拟器 · Pendulum Simulator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #1a1a24;
+    color: #d8d8e8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+                 ui-monospace, Menlo, Consolas, monospace, sans-serif;
+    user-select: none; -webkit-user-select: none;
+  }
+  canvas#stage {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab;
+    touch-action: none;
+  }
+  canvas#stage.dragging { cursor: grabbing; }
+
+  .panel {
+    position: absolute; top: 16px; left: 16px;
+    padding: 14px 16px 14px 16px;
+    border-radius: 12px;
+    background: rgba(20, 22, 32, 0.62);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(140, 150, 200, 0.18);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    width: 286px;
+    max-width: calc(100vw - 32px);
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+  .panel h1 {
+    margin: 0 0 10px 0; font-size: 14px; font-weight: 600; letter-spacing: 1px;
+    color: #b8c8ff;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel h1::before {
+    content: ""; display: inline-block;
+    width: 5px; height: 14px; border-radius: 2px;
+    background: linear-gradient(to bottom, #6cf, #b8c8ff);
+    box-shadow: 0 0 8px rgba(140, 200, 255, 0.7);
+  }
+  .panel .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .panel .row.btns { justify-content: space-between; }
+  .panel label {
+    flex: 1; display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    color: #aab2cc;
+  }
+  .panel label .name { width: 56px; color: #9098b8; font-size: 12px; }
+  .panel input[type="range"] {
+    flex: 1; height: 4px;
+    accent-color: #8aa9ff; cursor: pointer;
+  }
+  .panel .v {
+    min-width: 54px; text-align: right; color: #b8c8ff;
+    font-variant-numeric: tabular-nums;
+  }
+  .panel button {
+    background: rgba(80, 100, 160, 0.22);
+    color: #c8d4ff;
+    border: 1px solid rgba(140, 160, 220, 0.3);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s, transform .05s;
+  }
+  .panel button:hover  { background: rgba(110, 140, 210, 0.4); }
+  .panel button:active { transform: translateY(1px); }
+  .panel button.primary { background: rgba(100, 130, 220, 0.4); border-color: rgba(150, 180, 240, 0.6); }
+  .panel button.on { background: rgba(150, 200, 255, 0.35); border-color: rgba(180, 210, 255, 0.7); }
+
+  .panel .checkbox { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .panel .checkbox input { accent-color: #8aa9ff; }
+
+  .panel .info {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed rgba(140, 160, 220, 0.18);
+    font-size: 12px;
+    color: #8b94b4;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.8;
+  }
+  .panel .info b { color: #b0bcde; font-weight: 500; }
+  .panel .info .v { color: #6cf; }
+
+  .panel .formula {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(40, 44, 60, 0.6);
+    border-left: 2px solid rgba(140, 200, 255, 0.4);
+    font-size: 11px;
+    color: #b0bcde;
+    line-height: 1.6;
+  }
+  .panel .formula code { color: #aee0ff; font-weight: 500; }
+
+  .badge {
+    position: absolute; bottom: 14px; right: 16px;
+    font-size: 10.5px; color: #4e5878;
+    letter-spacing: 1.2px; text-transform: uppercase;
+  }
+  .badge span { color: #88a0d8; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div class="panel" role="group" aria-label="单摆控制面板">
+  <h1>单摆模拟器</h1>
+
+  <div class="row btns">
+    <button id="playBtn"   class="primary">⏸ 暂停</button>
+    <button id="resetBtn">↻ 重置</button>
+    <button id="energyBtn">能量曲线</button>
+  </div>
+
+  <div class="row">
+    <label>
+      <span class="name">摆长 L</span>
+      <input type="range" id="lengthInput" min="60" max="380" step="1" value="200">
+      <span class="v" id="lengthV">200 px</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <label>
+      <span class="name">重力 g</span>
+      <input type="range" id="gravityInput" min="0.5" max="30" step="0.1" value="9.8">
+      <span class="v" id="gravityV">9.8</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <label>
+      <span class="name">初角 θ₀</span>
+      <input type="range" id="angleInput" min="-89" max="89" step="1" value="45">
+      <span class="v" id="angleV">45°</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <label>
+      <span class="name">阻尼 b</span>
+      <input type="range" id="dampInput" min="0" max="0.5" step="0.005" value="0.05">
+      <span class="v" id="dampV">0.050</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <label class="checkbox">
+      <input type="checkbox" id="traceChk">
+      <span>显示运动轨迹</span>
+    </label>
+  </div>
+
+  <div class="info">
+    <b>周期 T</b> <span class="v" id="periodV">-</span> s<br>
+    <b>摆角 θ</b> <span class="v" id="thetaV">-</span>°<br>
+    <b>角速度 ω</b> <span class="v" id="omegaV">-</span> rad/s<br>
+    <b>总能量 E</b> <span class="v" id="energyV">-</span>
+  </div>
+
+  <div class="formula">
+    <code>θ̈ = -(g/L)·sin θ - b·θ̇</code><br>
+    <code>E = ½L²ω² + gL(1-cos θ)</code>
+  </div>
+</div>
+
+<div class="badge">RK4 · 60 fps · <span>vanilla canvas</span></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- canvas ----------
+  const canvas = document.getElementById('stage');
+  const ctx    = canvas.getContext('2d');
+  let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+
+  function resize() {
+    DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width  = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); // logical = CSS pixels
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // ---------- model ----------
+  const params = {
+    L:        200,                       // 摆长 px
+    g:        9.8,                       // 重力加速度 (m/s² scale 不严格)
+    angle0:   45 * Math.PI / 180,        // 初始摆角 rad
+    damping:  0.05,                      // 阻尼系数
+  };
+
+  const state = {
+    theta: params.angle0,
+    omega: 0,
+    t:     0,
+  };
+
+  let running     = true;
+  let showTrace   = false;
+  let showEnergy  = false;
+  const trace         = [];   // 球体历史位置
+  const TRACE_MAX     = 240;
+  const energyHistory = [];
+  const ENERGY_MAX    = 240;
+  const FIXED_DT      = 1 / 60;
+  let lastTime        = performance.now();
+  let accumulator     = 0;
+
+  // ---------- physics ----------
+  function derivs(theta, omega) {
+    return {
+      dTheta: omega,
+      dOmega: -(params.g / params.L) * Math.sin(theta) - params.damping * omega,
+    };
+  }
+  function rk4(theta, omega, dt) {
+    const k1 = derivs(theta, omega);
+    const k2 = derivs(theta + 0.5*dt*k1.dTheta,
+                      omega + 0.5*dt*k1.dOmega);
+    const k3 = derivs(theta + 0.5*dt*k2.dTheta,
+                      omega + 0.5*dt*k2.dOmega);
+    const k4 = derivs(theta + dt*k3.dTheta,
+                      omega + dt*k3.dOmega);
+    return {
+      theta: theta + (dt/6) * (k1.dTheta + 2*k2.dTheta + 2*k3.dTheta + k4.dTheta),
+      omega: omega + (dt/6) * (k1.dOmega + 2*k2.dOmega + 2*k3.dOmega + k4.dOmega),
+    };
+  }
+  function step(dt) {
+    const r = rk4(state.theta, state.omega, dt);
+    state.theta = r.theta;
+    state.omega = r.omega;
+    state.t    += dt;
+  }
+
+  function period() {                  // 简谐近似
+    return 2 * Math.PI * Math.sqrt(params.L / params.g);
+  }
+  function energies() {
+    const Ek = 0.5 * params.L * params.L * state.omega * state.omega;
+    const Ep = params.g * params.L * (1 - Math.cos(state.theta));
+    return { Ek, Ep, E: Ek + Ep };
+  }
+
+  // ---------- rendering ----------
+  function pivot() {
+    return { x: window.innerWidth / 2, y: Math.max(80, window.innerHeight * 0.16) };
+  }
+  function ballPos() {
+    const p = pivot();
+    return {
+      x: p.x + params.L * Math.sin(state.theta),
+      y: p.y + params.L * Math.cos(state.theta),
+    };
+  }
+
+  function drawBackdrop() {
+    const cx = window.innerWidth / 2, cy = window.innerHeight * 0.16;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy,
+      Math.max(window.innerWidth, window.innerHeight) * 0.7);
+    grad.addColorStop(0, '#22232f');
+    grad.addColorStop(1, '#1a1a24');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(140, 160, 220, 0.05)';
+    ctx.lineWidth = 1;
+    const step = 40;
+    for (let x = 0; x < window.innerWidth; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, window.innerHeight); ctx.stroke();
+    }
+    for (let y = 0; y < window.innerHeight; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(window.innerWidth, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawTrace() {
+    if (!showTrace || trace.length < 2) return;
+    ctx.save();
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'round';
+    for (let i = 1; i < trace.length; i++) {
+      const a = trace[i - 1], b = trace[i];
+      const t = i / trace.length;
+      ctx.strokeStyle = `rgba(140, 200, 255, ${0.05 + t * 0.45})`;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawRope(p, b) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(200, 215, 240, 0.55)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPivot(p) {
+    ctx.save();
+    ctx.fillStyle = '#b8c8ff';
+    ctx.shadowColor = 'rgba(140, 200, 255, 0.9)';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(180, 200, 240, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(180, 200, 240, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x, p.y + params.L);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBall(b) {
+    const speed    = Math.abs(state.omega);
+    const glowA    = Math.min(0.45 + speed * 0.10, 1);
+    const glowR    = 16 + Math.min(speed * 1.8, 18);
+
+    ctx.save();
+    // outer halo
+    ctx.fillStyle = `rgba(140, 200, 255, ${glowA * 0.35})`;
+    ctx.shadowColor = 'rgba(140, 200, 255, 1)';
+    ctx.shadowBlur = glowR;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // body
+    ctx.save();
+    const grad = ctx.createRadialGradient(
+      b.x - 4, b.y - 4, 1,
+      b.x,     b.y,     16
+    );
+    grad.addColorStop(0,    '#ffffff');
+    grad.addColorStop(0.35, '#aacfff');
+    grad.addColorStop(1,    '#3f6dc0');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 12.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y,     x + w, y + h, r);
+    c.arcTo(x + w, y + h, x,     y + h, r);
+    c.arcTo(x,     y + h, x,     y,     r);
+    c.arcTo(x,     y,     x + w, y,     r);
+    c.closePath();
+  }
+
+  function drawEnergyOverlay() {
+    if (!showEnergy || energyHistory.length < 2) return;
+    const W = 280, H = 92;
+    const X = window.innerWidth  - W - 16;
+    const Y = window.innerHeight - H - 16;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(20, 22, 32, 0.7)';
+    ctx.strokeStyle = 'rgba(140, 160, 220, 0.3)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, X, Y, W, H, 8);
+    ctx.fill(); ctx.stroke();
+
+    // zero baseline
+    ctx.strokeStyle = 'rgba(180, 200, 240, 0.12)';
+    ctx.beginPath();
+    ctx.moveTo(X + 8, Y + H / 2); ctx.lineTo(X + W - 8, Y + H / 2);
+    ctx.stroke();
+
+    // bars
+    const maxE = Math.max(...energyHistory.map(e => e.E), 1e-6);
+    for (let i = 0; i < energyHistory.length; i++) {
+      const e = energyHistory[i];
+      const cx = X + 8 + (i / ENERGY_MAX) * (W - 16);
+      const h1 = (e.Ek / maxE) * (H / 2 - 6);
+      const h2 = (e.Ep / maxE) * (H / 2 - 6);
+      ctx.fillStyle = 'rgba(140, 200, 255, 0.7)';
+      ctx.fillRect(cx, Y + H / 2 - h1, 1.6, h1);
+      ctx.fillStyle = 'rgba(255, 180, 100, 0.7)';
+      ctx.fillRect(cx, Y + H / 2,       1.6, h2);
+    }
+
+    const { Ek, Ep, E } = energies();
+    ctx.fillStyle = '#b8c8ff';
+    ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillText(`E  = ${E.toFixed(2)} J`,        X + 10, Y + 14);
+    ctx.fillText(`Ek = ${Ek.toFixed(2)} (动能)`,   X + 10, Y + H - 22);
+    ctx.fillText(`Ep = ${Ep.toFixed(2)} (势能)`,   X + 130, Y + H - 22);
+    ctx.restore();
+  }
+
+  function render() {
+    drawBackdrop();
+    const p = pivot();
+    const b = ballPos();
+    drawTrace();
+    drawRope(p, b);
+    drawPivot(p);
+    drawBall(b);
+    drawEnergyOverlay();
+  }
+
+  // ---------- main loop ----------
+  function loop(now) {
+    let dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if (dt > 0.25) dt = 0.25;
+
+    if (running) {
+      accumulator += dt;
+      // safety: max 5 substeps per frame to avoid spiral of death
+      let n = 0;
+      while (accumulator >= FIXED_DT && n < 5) {
+        step(FIXED_DT);
+        accumulator -= FIXED_DT;
+        n++;
+      }
+      if (accumulator >= FIXED_DT) accumulator = 0;
+
+      const bp = ballPos();
+      trace.push(bp);
+      if (trace.length > TRACE_MAX) trace.shift();
+
+      const e = energies();
+      energyHistory.push(e);
+      if (energyHistory.length > ENERGY_MAX) energyHistory.shift();
+    }
+
+    render();
+    updateInfo();
+    requestAnimationFrame(loop);
+  }
+
+  function updateInfo() {
+    document.getElementById('periodV').textContent = period().toFixed(2);
+    document.getElementById('thetaV').textContent  = (state.theta * 180 / Math.PI).toFixed(1);
+    document.getElementById('omegaV').textContent  = state.omega.toFixed(2);
+    const e = energies();
+    document.getElementById('energyV').textContent = e.E.toFixed(2);
+  }
+
+  // ---------- UI ----------
+  const $ = (id) => document.getElementById(id);
+
+  $('playBtn').addEventListener('click', () => {
+    running = !running;
+    $('playBtn').textContent = running ? '⏸ 暂停' : '▶ 播放';
+  });
+  $('resetBtn').addEventListener('click', () => {
+    state.theta = params.angle0;
+    state.omega = 0;
+    state.t     = 0;
+    trace.length = 0;
+    energyHistory.length = 0;
+  });
+  $('energyBtn').addEventListener('click', () => {
+    showEnergy = !showEnergy;
+    $('energyBtn').classList.toggle('on', showEnergy);
+    $('energyBtn').textContent = showEnergy ? '能量曲线 ✓' : '能量曲线';
+  });
+  $('traceChk').addEventListener('change', (e) => {
+    showTrace = e.target.checked;
+  });
+
+  $('lengthInput').addEventListener('input', (e) => {
+    params.L = parseFloat(e.target.value);
+    $('lengthV').textContent = params.L + ' px';
+  });
+  $('gravityInput').addEventListener('input', (e) => {
+    params.g = parseFloat(e.target.value);
+    $('gravityV').textContent = params.g.toFixed(1);
+  });
+  $('angleInput').addEventListener('input', (e) => {
+    params.angle0 = parseFloat(e.target.value) * Math.PI / 180;
+    $('angleV').textContent = e.target.value + '°';
+    state.theta = params.angle0;
+    state.omega = 0;
+  });
+  $('dampInput').addEventListener('input', (e) => {
+    params.damping = parseFloat(e.target.value);
+    $('dampV').textContent = params.damping.toFixed(3);
+  });
+
+  // ---------- drag the bob ----------
+  let dragging = false;
+  function pointerTo(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    const m = pointerTo(e);
+    const b = ballPos();
+    if ((m.x - b.x)**2 + (m.y - b.y)**2 < 36*36) {
+      dragging = true;
+      canvas.classList.add('dragging');
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+      if (!running) {
+        running = true;
+        $('playBtn').textContent = '⏸ 暂停';
+      }
+    }
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const m = pointerTo(e);
+    const p = pivot();
+    const dx = m.x - p.x, dy = m.y - p.y;
+    state.theta = Math.atan2(dx, dy);
+    state.omega = 0;
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    canvas.classList.remove('dragging');
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
