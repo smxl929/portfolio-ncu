@@ -1,0 +1,99 @@
+# ============================================================
+#  南昌大学 · 个人作品集 .gitignore
+#  适用多语言混合实验项目(护理专业,可包含 Python/R/Office 等)
+# ============================================================
+
+# ---------- 操作系统 ----------
+.DS_Store                  # macOS 资源记录
+Thumbs.db                  # Windows 图片缩略图
+desktop.ini                # Windows 文件夹配置
+$RECYCLE.BIN/              # Windows 回收站
+ehthumbs.db
+ehthumbs_vista.db
+*.lnk                      # Windows 快捷方式
+*~                         # Linux/macOS 备份文件
+
+# ---------- 常见 IDE / 编辑器 ----------
+.idea/                     # JetBrains 系列 (PyCharm / IntelliJ)
+.vscode/                   # VS Code(用户级配置由本机决定,通常保留)
+*.code-workspace
+*.swp                      # Vim 临时文件
+*.swo
+~$*.docx                   # Office 临时锁文件
+~$*.xlsx
+~$*.pptx
+
+# ---------- Node / 前端 ----------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# ---------- R 语言 ----------
+.Rhistory
+.RData
+.Rapp.history
+.Rproj.user/
+.Ruserdata
+
+# ---------- Jupyter ----------
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# ---------- 文档 / Office 临时文件 ----------
+*.bak
+*.lock
+
+# ---------- 大文件 / 二进制 ----------
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.psd
+*.ai
+
+# ---------- 环境变量 / 密钥 ----------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# ---------- 编译产物 ----------
+*.exe
+*.dll
+*.out
+*.o
+*.class
+*.jar
+target/
+
+# ---------- 日志 ----------
+*.log
+logs/
