@@ -22,7 +22,7 @@
   canvas#stage.dragging { cursor: grabbing; }
 
   .panel {
-    position: absolute; top: 16px; left: 16px;
+    position: absolute; bottom: 16px; left: 16px;
     padding: 14px 16px 14px 16px;
     border-radius: 12px;
     background: rgba(20, 22, 32, 0.62);
@@ -103,7 +103,7 @@
   .panel .formula code { color: #aee0ff; font-weight: 500; }
 
   .badge {
-    position: absolute; bottom: 14px; right: 16px;
+    position: absolute; top: 14px; right: 16px;
     font-size: 10.5px; color: #4e5878;
     letter-spacing: 1.2px; text-transform: uppercase;
   }
@@ -118,14 +118,14 @@
 
   <div class="row btns">
     <button id="playBtn"   class="primary">⏸ 暂停</button>
-    <button id="resetBtn">↻ 重置</button>
+    <button id="resetBtn">↻ 重置摆动</button>
     <button id="energyBtn">能量曲线</button>
   </div>
 
   <div class="row">
     <label>
       <span class="name">摆长 L</span>
-      <input type="range" id="lengthInput" min="60" max="380" step="1" value="200">
+      <input type="range" id="lengthInput" min="100" max="350" step="1" value="200">
       <span class="v" id="lengthV">200 px</span>
     </label>
   </div>
@@ -133,24 +133,16 @@
   <div class="row">
     <label>
       <span class="name">重力 g</span>
-      <input type="range" id="gravityInput" min="0.5" max="30" step="0.1" value="9.8">
+      <input type="range" id="gravityInput" min="1" max="25" step="0.1" value="9.8">
       <span class="v" id="gravityV">9.8</span>
     </label>
   </div>
 
   <div class="row">
     <label>
-      <span class="name">初角 θ₀</span>
-      <input type="range" id="angleInput" min="-89" max="89" step="1" value="45">
-      <span class="v" id="angleV">45°</span>
-    </label>
-  </div>
-
-  <div class="row">
-    <label>
       <span class="name">阻尼 b</span>
-      <input type="range" id="dampInput" min="0" max="0.5" step="0.005" value="0.05">
-      <span class="v" id="dampV">0.050</span>
+      <input type="range" id="dampInput" min="0" max="0.010" step="0.001" value="0.005">
+      <span class="v" id="dampV">0.005</span>
     </label>
   </div>
 
@@ -202,7 +194,7 @@
     L:        200,                       // 摆长 px
     g:        9.8,                       // 重力加速度 (m/s² scale 不严格)
     angle0:   45 * Math.PI / 180,        // 初始摆角 rad
-    damping:  0.05,                      // 阻尼系数
+    damping:  0.005,                     // 阻尼系数（细调,默认中等自然衰减）
   };
 
   const state = {
@@ -489,7 +481,8 @@
     $('playBtn').textContent = running ? '⏸ 暂停' : '▶ 播放';
   });
   $('resetBtn').addEventListener('click', () => {
-    state.theta = params.angle0;
+    // 精准复位到 45° 初始摆动状态,与初角滑块解耦
+    state.theta = 45 * Math.PI / 180;
     state.omega = 0;
     state.t     = 0;
     trace.length = 0;
@@ -512,12 +505,7 @@
     params.g = parseFloat(e.target.value);
     $('gravityV').textContent = params.g.toFixed(1);
   });
-  $('angleInput').addEventListener('input', (e) => {
-    params.angle0 = parseFloat(e.target.value) * Math.PI / 180;
-    $('angleV').textContent = e.target.value + '°';
-    state.theta = params.angle0;
-    state.omega = 0;
-  });
+  // 初角滑块已并入"重置摆动"按钮,不再需要 DOM 监听
   $('dampInput').addEventListener('input', (e) => {
     params.damping = parseFloat(e.target.value);
     $('dampV').textContent = params.damping.toFixed(3);
