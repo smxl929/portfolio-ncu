@@ -480,14 +480,24 @@
     running = !running;
     $('playBtn').textContent = running ? '⏸ 暂停' : '▶ 播放';
   });
-  $('resetBtn').addEventListener('click', () => {
+  // 重置摆动:提升为顶层具名函数,并全局暴露,兼容可能的 inline onclick
+  function resetAnimation() {
     // 精准复位到 45° 初始摆动状态,与初角滑块解耦
     state.theta = 45 * Math.PI / 180;
     state.omega = 0;
     state.t     = 0;
     trace.length = 0;
     energyHistory.length = 0;
-  });
+  }
+  // 防御:清理可能由其他工具/插件写入的 inline onclick 属性
+  {
+    const _rb = $('resetBtn');
+    if (_rb) { _rb.onclick = null; }
+  }
+  // 全局暴露,让潜在的 inline onclick="resetAnimation()" 也能工作
+  window.resetAnimation = resetAnimation;
+  // 优先用 addEventListener 绑定
+  $('resetBtn').addEventListener('click', resetAnimation);
   $('energyBtn').addEventListener('click', () => {
     showEnergy = !showEnergy;
     $('energyBtn').classList.toggle('on', showEnergy);
